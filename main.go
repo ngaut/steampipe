@@ -8,8 +8,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	_ "github.com/lib/pq"
-	"github.com/turbot/go-kit/helpers"
-	"github.com/turbot/steampipe/cmd"
+	"github.com/turbot/steampipe/control/controldisplay/xml"
 	"github.com/turbot/steampipe/utils"
 )
 
@@ -17,28 +16,31 @@ var Logger hclog.Logger
 var exitCode int
 
 func main() {
-	utils.LogTime("main start")
-	exitCode := 0
-	defer func() {
-		if r := recover(); r != nil {
-			utils.ShowError(helpers.ToError(r))
-		}
-		utils.LogTime("main end")
-		utils.DisplayProfileData()
-		os.Exit(exitCode)
-	}()
 
-	// ensure steampipe is not being run as root
-	checkRoot()
+	xml.XmlGen()
 
-	// increase the soft ULIMIT to match the hard limit
-	err := setULimit()
-	utils.FailOnErrorWithMessage(err, "failed to increase the file limit")
+	// utils.LogTime("main start")
+	// exitCode := 0
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		utils.ShowError(helpers.ToError(r))
+	// 	}
+	// 	utils.LogTime("main end")
+	// 	utils.DisplayProfileData()
+	// 	os.Exit(exitCode)
+	// }()
 
-	cmd.InitCmd()
+	// // ensure steampipe is not being run as root
+	// checkRoot()
 
-	// execute the command
-	exitCode = cmd.Execute()
+	// // increase the soft ULIMIT to match the hard limit
+	// err := setULimit()
+	// utils.FailOnErrorWithMessage(err, "failed to increase the file limit")
+
+	// cmd.InitCmd()
+
+	// // execute the command
+	// exitCode = cmd.Execute()
 }
 
 // set the current to the max to avoid any file handle shortages
