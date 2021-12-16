@@ -131,11 +131,11 @@ func runCheckCmd(cmd *cobra.Command, args []string) {
 	}
 
 	// initialise
-	initData = initialiseCheck(spinner)
+	initData = initialiseCheck(cmd.Context(), spinner)
+	display.StopSpinner(spinner)
 	if shouldExit := handleCheckInitResult(initData); shouldExit {
 		return
 	}
-	display.StopSpinner(spinner)
 
 	// pull out useful properties
 	ctx := initData.ctx
@@ -191,7 +191,7 @@ func runCheckCmd(cmd *cobra.Command, args []string) {
 	exitCode = failures
 }
 
-func initialiseCheck(spinner *spinner.Spinner) *checkInitData {
+func initialiseCheck(ctx context.Context, spinner *spinner.Spinner) *checkInitData {
 	initData := &checkInitData{
 		result: &db_common.InitResult{},
 	}
@@ -210,7 +210,7 @@ func initialiseCheck(spinner *spinner.Spinner) *checkInitData {
 		return initData
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	startCancelHandler(cancel)
 	initData.ctx = ctx
 
@@ -245,12 +245,12 @@ func initialiseCheck(spinner *spinner.Spinner) *checkInitData {
 	// get a client
 	var client db_common.Client
 	if connectionString := viper.GetString(constants.ArgConnectionString); connectionString != "" {
-		client, err = db_client.NewDbClient(connectionString)
+		client, err = db_client.NewDbClient(initData.ctx, connectionString)
 	} else {
 		// stop the spinner
 		display.StopSpinner(spinner)
 		// when starting the database, installers may trigger their own spinners
-		client, err = db_local.GetLocalClient(constants.InvokerCheck)
+		client, err = db_local.GetLocalClient(initData.ctx, constants.InvokerCheck)
 		// resume the spinner
 		display.ResumeSpinner(spinner)
 	}
@@ -261,7 +261,7 @@ func initialiseCheck(spinner *spinner.Spinner) *checkInitData {
 	}
 	initData.client = client
 
-	refreshResult := initData.client.RefreshConnectionAndSearchPaths()
+	refreshResult := initData.client.RefreshConnectionAndSearchPaths(initData.ctx)
 	if refreshResult.Error != nil {
 		initData.result.Error = refreshResult.Error
 		return initData
@@ -379,6 +379,10 @@ func validateExportTargets(exportTargets []controldisplay.CheckExportTarget) err
 
 func initialiseColorScheme() error {
 	theme := viper.GetString(constants.ArgTheme)
+	if !viper.GetBool(constants.ConfigKeyIsTerminalTTY) {
+		// enforce plain output for non-terminals
+		theme = "plain"
+	}
 	themeDef, ok := controldisplay.ColorSchemes[theme]
 	if !ok {
 		return fmt.Errorf("invalid theme '%s'", theme)

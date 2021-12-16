@@ -22,11 +22,6 @@ func CreatePreparedStatements(ctx context.Context, resourceMaps *modconfig.Works
 	if len(sqlMap) == 0 {
 		return nil, nil
 	}
-	// first try to run the whole thing in one query
-	var queries []string
-	for _, q := range sqlMap {
-		queries = append(queries, q)
-	}
 
 	for name, sql := range sqlMap {
 		if _, err := session.Connection.ExecContext(ctx, sql); err != nil {
@@ -46,9 +41,13 @@ func GetPreparedStatementsSQL(resourceMaps *modconfig.WorkspaceResourceMaps) map
 		if _, ok := sqlMap[query.FullName]; ok {
 			continue
 		}
+		// if the query does not have parameters, it is NOT a prepared statement
+		if len(query.Params) == 0 {
+			continue
+		}
 
 		// remove trailing semicolons from sql as this breaks the prepare statement
-		rawSql := strings.TrimRight(strings.TrimSpace(typehelpers.SafeString(query.SQL)), ";")
+		rawSql := cleanPreparedStatementSQL(typehelpers.SafeString(query.SQL))
 		preparedStatementName := query.GetPreparedStatementName()
 		sqlMap[query.FullName] = fmt.Sprintf("PREPARE %s AS (\n%s\n)", preparedStatementName, rawSql)
 	}
@@ -62,6 +61,10 @@ func GetPreparedStatementsSQL(resourceMaps *modconfig.WorkspaceResourceMaps) map
 		if control.SQL == nil {
 			continue
 		}
+		// if the control does not have parameters, it is NOT a prepared statement
+		if len(control.Params) == 0 {
+			continue
+		}
 
 		// remove trailing semicolons from sql as this breaks the prepare statement
 		rawSql := strings.TrimRight(strings.TrimSpace(typehelpers.SafeString(control.SQL)), ";")
@@ -70,5 +73,9 @@ func GetPreparedStatementsSQL(resourceMaps *modconfig.WorkspaceResourceMaps) map
 	}
 
 	return sqlMap
+}
 
+func cleanPreparedStatementSQL(query string) string {
+	rawSql := strings.TrimRight(strings.TrimSpace(query), ";")
+	return rawSql
 }
